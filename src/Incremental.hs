@@ -85,14 +85,14 @@ data ElementOptions (e :: Symbol)
   | KeyAndStatics {-# UNPACK #-} !JSString
                   {-# UNPACK #-} !(StaticAttributes e)
 
-noKey :: ElementOptions e
-noKey = NoKey
+noKey :: Monad m => m (ElementOptions e)
+noKey = return NoKey
 
-key :: JSString -> ElementOptions e
-key = Key
+key :: Monad m => JSString -> m (ElementOptions e)
+key = return . Key
 
-keyAndStatics :: JSString -> StaticAttributes e -> ElementOptions e
-keyAndStatics = KeyAndStatics
+keyAndStatics :: Monad m => JSString -> StaticAttributes e -> m (ElementOptions e)
+keyAndStatics str = return . KeyAndStatics str
 
 optVals :: ElementOptions e -> (JSVal, JSVal)
 optVals NoKey                = (nullRef, nullRef)
@@ -109,9 +109,9 @@ attributesToArray as = do
     push v arr
   unsafeFreeze arr
 
-elementOpen :: MonadBase Incremental m => p e -> JSString -> ElementOptions e -> [Attribute e] -> m Element
+elementOpen :: MonadBase Incremental m => p e -> JSString -> m (ElementOptions e) -> [Attribute e] -> m Element
 elementOpen _ name opts dynamics = do
-  let (k, statics) = optVals opts
+  (k, statics) <- optVals <$> opts
   liftBase $ Incremental (js_elementOpen name k statics . jsval =<< attributesToArray dynamics)
 
 foreign import javascript unsafe "IncrementalDOM.elementOpenStart($1, $2, $3)" js_elementOpenStart :: JSString -> JSVal -> JSVal -> IO ()
@@ -139,9 +139,9 @@ elementClose = liftBase . Incremental . js_elementClose
 foreign import javascript unsafe "IncrementalDOM.elementVoid.apply(this, [$1, $2, $3].concat($4))" js_elementVoid :: JSString -> JSVal -> JSVal -> JSVal -> IO Element
 
 
-elementVoid :: MonadBase Incremental m => p e -> JSString -> ElementOptions e -> [Attribute e] -> m Element
+elementVoid :: MonadBase Incremental m => p e -> JSString -> m (ElementOptions e) -> [Attribute e] -> m Element
 elementVoid _ name opts dynamics = do
-  let (k, statics) = optVals opts
+  (k, statics) <- optVals <$> opts
   liftBase $ Incremental (js_elementVoid name k statics . jsval =<< attributesToArray dynamics)
 
 foreign import javascript unsafe "IncrementalDOM.text($1)" js_text :: JSString -> JSVal -> IO Text
@@ -175,7 +175,7 @@ callPatcher n (Patcher cb) x = withExport x (js_patch n cb . jsval)
 releasePatcher :: Patcher a -> IO ()
 releasePatcher (Patcher f) = releaseCallback f
 
-element :: MonadBase Incremental m => p e -> JSString -> ElementOptions e -> [Attribute e] -> m a -> m (Element, a)
+element :: MonadBase Incremental m => p e -> JSString -> m (ElementOptions e) -> [Attribute e] -> m a -> m (Element, a)
 element p name opts dynamics inner = do
   e <- elementOpen p name opts dynamics
   a <- inner
