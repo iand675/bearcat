@@ -1,4 +1,9 @@
-module Reactor where
+module Reactor
+  ( Reactor
+  , reactor
+  , cancelReactor
+  , update
+  ) where
 
 import Control.Concurrent
 import Control.Concurrent.Async
