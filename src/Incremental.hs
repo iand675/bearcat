@@ -4,6 +4,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Incremental
     ( ElementOptions
     , Incremental
@@ -38,6 +39,7 @@ import Control.Monad
 import Control.Monad.Base
 import Control.Monad.Trans
 import Data.JSString
+import Data.String
 import Data.Typeable
 import GHC.TypeLits
 import GHCJS.DOM.Element
@@ -64,6 +66,9 @@ newtype Incremental a = Incremental (IO a)
 
 instance MonadBase Incremental Incremental where
   liftBase = id
+
+instance IsString (Incremental Text) where
+  fromString = text . pack
 
 {-
 open :: String -> Maybe String -> ElementOpen () -> Incremental ()
