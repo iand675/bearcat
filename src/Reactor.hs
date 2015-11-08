@@ -33,5 +33,5 @@ update :: Reactor a -> a -> IO ()
 update r x = do
   atomically $ putTMVar (stateRef r) x
   -- Give reactor a chance to render immediately.
-  -- Not sure if this is enough to guarantee that it will happen.
+  -- Not sure if this is enough to totally *guarantee* that it will happen.
   yield
