@@ -24,6 +24,9 @@ module Incremental
     , makePatcher
     , callPatcher
     , releasePatcher
+    , notifications
+    , onNodesCreated
+    , onNodesDeleted
     , js_elementOpen
     , js_elementOpenStart
     , js_attr
@@ -47,11 +50,14 @@ import GHCJS.DOM.Node
 import GHCJS.DOM.Text
 import GHCJS.Foreign ()
 import GHCJS.Foreign.Callback
+import GHCJS.Foreign.Callback.Internal (Callback(..))
 import GHCJS.Foreign.Export
 import GHCJS.Marshal
 import GHCJS.Prim (JSVal)
 import GHCJS.Types
 import JavaScript.Array
+import JavaScript.Object hiding (create)
+import JavaScript.Object.Internal (Object(..))
 import Unsafe.Coerce
 
 -- TODO flip this around
@@ -182,3 +188,52 @@ element p name opts dynamics inner = do
   elementClose name
   return (e, a)
 
+foreign import javascript unsafe "IncrementalDOM.notifications" notifications :: Object
+
+onNodesCreated :: Maybe ([Node] -> IO ()) -> IO ()
+onNodesCreated mf = do
+  val <- unsafeGetProp "nodesCreated" notifications 
+  if isNull val
+    then return ()
+    else do
+      isHsFun <- do
+        prop <- unsafeGetProp "isHsCallback" (Object val)
+        if isUndefined prop
+          then return False
+          else fromJSValUnchecked prop
+      if isHsFun
+        then releaseCallback (unsafeCoerce val :: Callback (JSVal -> IO ()))
+        else return ()
+  case mf of
+    Nothing -> unsafeSetProp "nodesCreated" nullRef notifications
+    Just f -> do
+      (Callback cb) <- syncCallback1 ContinueAsync $ \arr -> do
+        ns <- fromJSValUnchecked arr
+        f ns
+      yes <- toJSVal True
+      unsafeSetProp "isHsCallback" yes (Object cb) 
+      unsafeSetProp "nodesCreated" cb notifications 
+
+onNodesDeleted :: Maybe ([Node] -> IO ()) -> IO ()
+onNodesDeleted mf = do
+  val <- unsafeGetProp "nodesDeleted" notifications 
+  if isNull val
+    then return ()
+    else do
+      isHsFun <- do
+        prop <- unsafeGetProp "isHsCallback" (Object val)
+        if isUndefined prop
+          then return False
+          else fromJSValUnchecked prop
+      if isHsFun
+        then releaseCallback (unsafeCoerce val :: Callback (JSVal -> IO ()))
+        else return ()
+  case mf of
+    Nothing -> unsafeSetProp "nodesDeleted" nullRef notifications
+    Just f -> do
+      (Callback cb) <- syncCallback1 ContinueAsync $ \arr -> do
+        ns <- fromJSValUnchecked arr
+        f ns
+      yes <- toJSVal True
+      unsafeSetProp "isHsCallback" yes (Object cb) 
+      unsafeSetProp "nodesDeleted" cb notifications 
